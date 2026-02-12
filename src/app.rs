@@ -1,4 +1,6 @@
+use crate::data::{SessionData, SessionStore};
 use crate::message::Message;
+use crate::watcher;
 use cosmic::{
     app::{Command, Core},
     applet::Context,
@@ -14,6 +16,7 @@ pub struct CcBar {
     core: Core,
     context: Context,
     popup: Option<window::Id>,
+    session_store: SessionStore,
 }
 
 impl Application for CcBar {
@@ -36,6 +39,7 @@ impl Application for CcBar {
             core,
             context,
             popup: None,
+            session_store: SessionStore::new(),
         };
         (app, Command::none())
     }
@@ -65,12 +69,38 @@ impl Application for CcBar {
                     get_popup(popup_settings)
                 }
             }
-            Message::SessionUpdate(_session_id) => {
-                // TODO: セッション更新処理
+            Message::SessionUpdate(session_id) => {
+                // セッションファイルを読み込んで更新
+                let runtime_dir = dirs::runtime_dir().unwrap_or_else(|| {
+                    let uid = unsafe { libc::getuid() };
+                    std::path::PathBuf::from(format!("/run/user/{}", uid))
+                });
+                let session_file = runtime_dir
+                    .join("cc-bar")
+                    .join("sessions")
+                    .join(format!("{}.json", session_id));
+
+                if let Ok(content) = std::fs::read_to_string(&session_file) {
+                    if let Ok(status) =
+                        serde_json::from_str::<crate::data::StatusLineData>(&content)
+                    {
+                        let project_dir = session_file
+                            .parent()
+                            .and_then(|p| p.parent())
+                            .map(|p| p.file_name())
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        self.session_store
+                            .update_from_status_line(status, project_dir);
+                    }
+                }
                 Command::none()
             }
             Message::Tick => {
-                // TODO: staleセッション除去
+                // 5分（300秒）以上更新がないセッションを除去
+                self.session_store.remove_stale_sessions(300);
                 Command::none()
             }
         }
@@ -92,11 +122,46 @@ impl Application for CcBar {
 
     fn view_window(&self, id: window::Id) -> Element<Self::Message> {
         if self.popup == Some(id) {
-            let content = widget::column()
+            let mut content = widget::column()
                 .padding(16)
-                .spacing(8)
-                .push(widget::text("Claude Code Sessions").size(20))
-                .push(widget::text("セッション監視中..."));
+                .spacing(12)
+                .push(widget::text("Claude Code Sessions").size(20));
+
+            let sessions = self.session_store.get_all_sessions();
+
+            if sessions.is_empty() {
+                content = content.push(widget::text("セッション監視中...").size(14));
+            } else {
+                for session in sessions {
+                    let model_label = match session.model_name.as_str() {
+                        "Opus" => "O",
+                        "Sonnet" => "S",
+                        "Haiku" => "H",
+                        _ => "?",
+                    };
+
+                    let session_info = widget::column()
+                        .spacing(4)
+                        .push(
+                            widget::text(format!(
+                                "{} [{}] - {}%",
+                                model_label, session.project_dir, session.context_used_percent
+                            ))
+                            .size(14),
+                        )
+                        .push(
+                            widget::text(format!(
+                                "Cost: ${:.3} | Duration: {:.1}s | Peak: {}%",
+                                session.cost_usd,
+                                session.duration_ms as f64 / 1000.0,
+                                session.peak_usage_percent
+                            ))
+                            .size(12),
+                        );
+
+                    content = content.push(session_info);
+                }
+            }
 
             self.context.popup_container(content).into()
         } else {
@@ -105,7 +170,7 @@ impl Application for CcBar {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        // TODO: ファイル監視とタイマーのSubscription
-        Subscription::none()
+        // ファイル監視とタイマーを統合
+        Subscription::batch(vec![watcher::watch_sessions(), watcher::tick_timer()])
     }
 }
