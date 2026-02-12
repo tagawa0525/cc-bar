@@ -13,8 +13,10 @@ pub struct StatusLineData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextWindow {
-    pub used_percentage: u32,
-    pub remaining_percentage: u32,
+    #[serde(default)]
+    pub used_percentage: Option<u32>,
+    #[serde(default)]
+    pub remaining_percentage: Option<u32>,
     pub context_window_size: u32,
     pub total_input_tokens: u32,
     pub total_output_tokens: u32,
@@ -68,6 +70,8 @@ impl SessionStore {
             .unwrap()
             .as_secs();
 
+        let used = status.context_window.used_percentage.unwrap_or(0);
+
         let session = self
             .sessions
             .entry(session_id)
@@ -75,23 +79,24 @@ impl SessionStore {
                 session_id: status.session_id.clone(),
                 project_dir: project_dir.clone(),
                 model_name: status.model.display_name.clone(),
-                context_used_percent: status.context_window.used_percentage,
+                context_used_percent: used,
                 cost_usd: status.cost.total_cost_usd,
                 duration_ms: status.cost.total_duration_ms,
-                peak_usage_percent: status.context_window.used_percentage,
+                peak_usage_percent: used,
                 subagent_completed_count: 0,
                 last_updated_at: now,
             });
 
         // Update fields
-        session.context_used_percent = status.context_window.used_percentage;
+        session.model_name = status.model.display_name.clone();
+        session.context_used_percent = used;
         session.cost_usd = status.cost.total_cost_usd;
         session.duration_ms = status.cost.total_duration_ms;
         session.last_updated_at = now;
 
         // Track peak usage
-        if status.context_window.used_percentage > session.peak_usage_percent {
-            session.peak_usage_percent = status.context_window.used_percentage;
+        if used > session.peak_usage_percent {
+            session.peak_usage_percent = used;
         }
     }
 
@@ -119,20 +124,37 @@ impl SessionStore {
             });
     }
 
-    /// Staleセッション（5分以上更新がない）を除去
-    pub fn remove_stale_sessions(&mut self, stale_threshold_secs: u64) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        self.sessions
-            .retain(|_, session| now - session.last_updated_at < stale_threshold_secs);
+    /// ファイルのmtimeが古いセッションを除去
+    pub fn remove_stale_by_mtime(&mut self, sessions_dir: &std::path::Path, threshold_secs: u64) {
+        let now = SystemTime::now();
+        self.sessions.retain(|session_id, _| {
+            let path = sessions_dir.join(format!("{}.json", session_id));
+            match std::fs::metadata(&path) {
+                Ok(meta) => match meta.modified() {
+                    Ok(mtime) => now
+                        .duration_since(mtime)
+                        .map(|d| d.as_secs() < threshold_secs)
+                        .unwrap_or(true),
+                    Err(_) => false,
+                },
+                Err(_) => false, // ファイルが存在しない→除去
+            }
+        });
     }
 
-    /// すべてのセッションを取得
+    /// すべてのセッションを取得（Opus→Sonnet→Haiku順）
     pub fn get_all_sessions(&self) -> Vec<SessionData> {
-        self.sessions.values().cloned().collect()
+        let mut sessions: Vec<SessionData> = self.sessions.values().cloned().collect();
+        sessions.sort_by_key(|s| {
+            let name = s.model_name.split_whitespace().next().unwrap_or("");
+            match name {
+                "Opus" => 0,
+                "Sonnet" => 1,
+                "Haiku" => 2,
+                _ => 3,
+            }
+        });
+        sessions
     }
 
     /// セッション数を取得
@@ -179,7 +201,7 @@ mod tests {
 
         let status: StatusLineData = serde_json::from_str(json).expect("Failed to parse JSON");
         assert_eq!(status.session_id, "abc123xyz");
-        assert_eq!(status.context_window.used_percentage, 62);
+        assert_eq!(status.context_window.used_percentage, Some(62));
         assert_eq!(status.model.display_name, "Opus");
     }
 
@@ -189,8 +211,8 @@ mod tests {
 
         let status = StatusLineData {
             context_window: ContextWindow {
-                used_percentage: 50,
-                remaining_percentage: 50,
+                used_percentage: Some(50),
+                remaining_percentage: Some(50),
                 context_window_size: 200000,
                 total_input_tokens: 100000,
                 total_output_tokens: 5000,
@@ -221,8 +243,8 @@ mod tests {
 
         let status1 = StatusLineData {
             context_window: ContextWindow {
-                used_percentage: 30,
-                remaining_percentage: 70,
+                used_percentage: Some(30),
+                remaining_percentage: Some(30),
                 context_window_size: 200000,
                 total_input_tokens: 60000,
                 total_output_tokens: 3000,
@@ -245,8 +267,8 @@ mod tests {
         // Update with higher usage
         let status2 = StatusLineData {
             context_window: ContextWindow {
-                used_percentage: 75,
-                remaining_percentage: 25,
+                used_percentage: Some(75),
+                remaining_percentage: Some(25),
                 context_window_size: 200000,
                 total_input_tokens: 150000,
                 total_output_tokens: 5000,

@@ -5,10 +5,14 @@ use cosmic::{
     app::{Core, Task},
     iced::{
         platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
-        window, Subscription,
+        window, Limits, Subscription,
     },
-    widget, Application, Element,
+    widget::{self, Id},
+    Application, Element,
 };
+use std::sync::LazyLock;
+
+static AUTOSIZE_MAIN_ID: LazyLock<Id> = LazyLock::new(|| Id::new("autosize-main"));
 
 /// display_name（例: "Opus 4.6", "Sonnet"）からモデル型を返す
 fn model_type(display_name: &str) -> &'static str {
@@ -112,7 +116,12 @@ impl Application for CcBar {
                 Task::none()
             }
             Message::Tick => {
-                self.session_store.remove_stale_sessions(300);
+                let runtime_dir = dirs::runtime_dir().unwrap_or_else(|| {
+                    let uid = unsafe { libc::getuid() };
+                    std::path::PathBuf::from(format!("/run/user/{}", uid))
+                });
+                let sessions_dir = runtime_dir.join("cc-bar").join("sessions");
+                self.session_store.remove_stale_by_mtime(&sessions_dir, 15);
                 Task::none()
             }
             Message::CloseRequested(id) => {
@@ -135,10 +144,10 @@ impl Application for CcBar {
                 .into()
         } else {
             let suggested = self.core.applet.suggested_size(true);
-            let chart_size = (suggested.0 as f32) * 1.5;
+            let chart_size = ((suggested.0 as f32) * 1.5).min(suggested.1 as f32);
             let mut row = widget::row().spacing(4);
 
-            for session in sessions.iter().take(3) {
+            for session in &sessions {
                 let model_type_str = model_type(&session.model_name);
 
                 row = row.push(crate::chart::donut_view::<Message>(
@@ -148,15 +157,24 @@ impl Application for CcBar {
                 ));
             }
 
-            if sessions.len() > 3 {
-                row = row.push(widget::text(format!("+{}", sessions.len() - 3)).size(12));
+            let content = widget::mouse_area(row).on_press(Message::TogglePopup);
+
+            let mut limits = Limits::NONE.min_width(1.).min_height(1.);
+            if let Some(b) = self.core.applet.suggested_bounds {
+                if b.width as i32 > 0 {
+                    limits = limits.max_width(b.width);
+                }
+                if b.height as i32 > 0 {
+                    limits = limits.max_height(b.height);
+                }
             }
 
-            self.core
-                .applet
-                .button_from_element(row, true)
-                .on_press_down(Message::TogglePopup)
-                .into()
+            widget::autosize::autosize(
+                widget::container(content).padding(0),
+                AUTOSIZE_MAIN_ID.clone(),
+            )
+            .limits(limits)
+            .into()
         }
     }
 
