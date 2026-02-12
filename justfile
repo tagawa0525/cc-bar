@@ -49,6 +49,7 @@ install: build
     nix develop --command bash -c \
         'patchelf --set-rpath "$(echo "$LD_LIBRARY_PATH" | sed "s/:$//")" target/release/cc-bar'
 
+    rm -f "$INSTALL_DIR/cc-bar"
     cp target/release/cc-bar "$INSTALL_DIR/"
     cp scripts/cc-bar-relay.sh "$INSTALL_DIR/"
     cp scripts/cc-bar-subagent-hook.sh "$INSTALL_DIR/"

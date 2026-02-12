@@ -144,8 +144,8 @@ impl Application for CcBar {
                 .into()
         } else {
             let suggested = self.core.applet.suggested_size(true);
-            let chart_size = ((suggested.0 as f32) * 1.5).min(suggested.1 as f32);
-            let mut row = widget::row().spacing(4);
+            let chart_size = suggested.1 as f32;
+            let mut row = widget::row().spacing(2);
 
             for session in &sessions {
                 let model_type_str = model_type(&session.model_name);
