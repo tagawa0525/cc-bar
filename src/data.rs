@@ -34,6 +34,7 @@ pub struct Cost {
 
 /// セッション情報
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SessionData {
     pub session_id: String,
     pub project_dir: String,
@@ -51,6 +52,7 @@ pub struct SessionStore {
     sessions: HashMap<String, SessionData>,
 }
 
+#[allow(dead_code)]
 impl SessionStore {
     pub fn new() -> Self {
         SessionStore {
@@ -66,7 +68,7 @@ impl SessionStore {
             .unwrap()
             .as_secs();
 
-        let mut session = self
+        let session = self
             .sessions
             .entry(session_id)
             .or_insert_with(|| SessionData {
