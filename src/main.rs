@@ -1,4 +1,5 @@
 mod app;
+mod chart;
 mod config;
 mod data;
 mod message;
