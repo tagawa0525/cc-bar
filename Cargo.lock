@@ -769,6 +769,7 @@ dependencies = [
  "dirs 5.0.1",
  "futures-util",
  "inotify",
+ "libc",
  "libcosmic",
  "serde",
  "serde_json",

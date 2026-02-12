@@ -2,10 +2,10 @@ use crate::data::SessionStore;
 use crate::message::Message;
 use crate::watcher;
 use cosmic::{
-    app::{self, Core, Task},
+    app::{Core, Task},
     iced::{
         platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
-        window, Alignment, Length, Subscription,
+        window, Subscription,
     },
     widget, Application, Element,
 };
@@ -100,28 +100,18 @@ impl Application for CcBar {
         }
     }
 
-    fn view(&self) -> Element<Self::Message> {
+    fn view(&self) -> Element<'_, Self::Message> {
         let sessions = self.session_store.get_all_sessions();
 
         if sessions.is_empty() {
-            let content = widget::text("—")
-                .size(20)
-                .width(Length::Shrink)
-                .height(Length::Shrink)
-                .horizontal_alignment(Alignment::Center)
-                .vertical_alignment(Alignment::Center);
-
             self.core
                 .applet
-                .icon_button_from_handle(
-                    widget::icon::from_name("dialog-information-symbolic")
-                        .symbolic(true)
-                        .size(self.core.applet.suggested_size(true).0)
-                        .into(),
-                )
+                .icon_button("dialog-information-symbolic")
                 .on_press_down(Message::TogglePopup)
                 .into()
         } else {
+            let suggested = self.core.applet.suggested_size(true);
+            let chart_size = suggested.0 as f32;
             let mut row = widget::row().spacing(4);
 
             for session in sessions.iter().take(3) {
@@ -132,9 +122,11 @@ impl Application for CcBar {
                     _ => '?',
                 };
 
-                let chart =
-                    crate::chart::DonutChart::new(session.context_used_percent, model_label);
-                row = row.push(chart.view());
+                row = row.push(crate::chart::donut_view::<Message>(
+                    session.context_used_percent,
+                    model_label,
+                    chart_size,
+                ));
             }
 
             if sessions.len() > 3 {
@@ -149,7 +141,7 @@ impl Application for CcBar {
         }
     }
 
-    fn view_window(&self, id: window::Id) -> Element<Self::Message> {
+    fn view_window(&self, id: window::Id) -> Element<'_, Self::Message> {
         if self.popup != Some(id) {
             return widget::text("").into();
         }
