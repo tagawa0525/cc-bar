@@ -4,7 +4,7 @@ set shell := ["bash", "-c"]
 
 # 開発環境の初期化
 init:
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "cc-bar: Claude Code Context Window Monitor"
     echo ""
     echo "依存インストール中..."
@@ -39,7 +39,7 @@ fmt:
 
 # インストール（ユーザーローカル）
 install: build
-    #!/bin/bash
+    #!/usr/bin/env bash
     set -euo pipefail
 
     INSTALL_DIR="${HOME}/.local/bin"
@@ -55,7 +55,7 @@ install: build
 
 # Claude Codeの設定
 configure:
-    #!/bin/bash
+    #!/usr/bin/env bash
     set -euo pipefail
 
     CLAUDE_DIR="${HOME}/.claude"
@@ -96,7 +96,7 @@ configure:
 
 # デスクトップファイルのインストール
 install-desktop:
-    #!/bin/bash
+    #!/usr/bin/env bash
     set -euo pipefail
 
     DESKTOP_DIR="${HOME}/.local/share/applications"
@@ -109,7 +109,7 @@ install-desktop:
 
 # すべてのセットアップ
 setup: install install-desktop configure
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo ""
     echo "========================================="
     echo "✓ cc-bar セットアップ完了"
