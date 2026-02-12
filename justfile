@@ -45,6 +45,10 @@ install: build
     INSTALL_DIR="${HOME}/.local/bin"
     mkdir -p "$INSTALL_DIR"
 
+    # NixOS: dlopen用ライブラリパスをバイナリに焼き込む
+    nix develop --command bash -c \
+        'patchelf --set-rpath "$(echo "$LD_LIBRARY_PATH" | sed "s/:$//")" target/release/cc-bar'
+
     cp target/release/cc-bar "$INSTALL_DIR/"
     cp scripts/cc-bar-relay.sh "$INSTALL_DIR/"
     cp scripts/cc-bar-subagent-hook.sh "$INSTALL_DIR/"
@@ -81,9 +85,9 @@ configure:
     jq \
         --arg status_line "$STATUS_LINE_SCRIPT" \
         --arg subagent_hook "$SUBAGENT_HOOK_SCRIPT" \
-        '.statusLine = $status_line |
+        '.statusLine = {"type": "command", "command": $status_line} |
          .hooks //= {} |
-         .hooks.SubagentStop = $subagent_hook' \
+         .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": $subagent_hook}]}]' \
         "$SETTINGS" > "$SETTINGS.tmp" && \
         mv "$SETTINGS.tmp" "$SETTINGS"
 
