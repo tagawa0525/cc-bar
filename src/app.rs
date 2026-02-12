@@ -10,6 +10,17 @@ use cosmic::{
     widget, Application, Element,
 };
 
+/// display_name（例: "Opus 4.6", "Sonnet"）からモデル型を返す
+fn model_type(display_name: &str) -> &'static str {
+    let name = display_name.split_whitespace().next().unwrap_or("");
+    match name {
+        "Opus" => "Opus",
+        "Sonnet" => "Sonnet",
+        "Haiku" => "Haiku",
+        _ => "Sonnet",
+    }
+}
+
 pub struct CcBar {
     core: Core,
     popup: Option<window::Id>,
@@ -31,6 +42,7 @@ impl Application for CcBar {
     }
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
+        crate::log!("cc-bar: init called");
         let app = CcBar {
             core,
             popup: None,
@@ -59,7 +71,8 @@ impl Application for CcBar {
                     get_popup(popup_settings)
                 }
             }
-            Message::SessionUpdate(session_id) => {
+            Message::SessionUpdate(ref session_id) => {
+                crate::log!("cc-bar: SessionUpdate received for {}", session_id);
                 let runtime_dir = dirs::runtime_dir().unwrap_or_else(|| {
                     let uid = unsafe { libc::getuid() };
                     std::path::PathBuf::from(format!("/run/user/{}", uid))
@@ -69,22 +82,33 @@ impl Application for CcBar {
                     .join("sessions")
                     .join(format!("{}.json", session_id));
 
-                if let Ok(content) = std::fs::read_to_string(&session_file) {
-                    if let Ok(status) =
-                        serde_json::from_str::<crate::data::StatusLineData>(&content)
-                    {
-                        let project_dir = session_file
-                            .parent()
-                            .and_then(|p| p.parent())
-                            .and_then(|p| p.file_name())
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("Unknown")
-                            .to_string();
-
-                        self.session_store
-                            .update_from_status_line(status, project_dir);
+                match std::fs::read_to_string(&session_file) {
+                    Ok(content) => {
+                        match serde_json::from_str::<crate::data::StatusLineData>(&content) {
+                            Ok(status) => {
+                                let project_dir = session_file
+                                    .parent()
+                                    .and_then(|p| p.parent())
+                                    .and_then(|p| p.file_name())
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("Unknown")
+                                    .to_string();
+                                crate::log!(
+                                    "cc-bar: parsed session, usage={:?}%",
+                                    status.context_window.used_percentage
+                                );
+                                self.session_store
+                                    .update_from_status_line(status, project_dir);
+                            }
+                            Err(e) => crate::log!("cc-bar: JSON parse error: {}", e),
+                        }
                     }
+                    Err(e) => crate::log!("cc-bar: file read error: {}", e),
                 }
+                Task::none()
+            }
+            Message::SessionRemoved(ref session_id) => {
+                self.session_store.remove_session(session_id);
                 Task::none()
             }
             Message::Tick => {
@@ -111,20 +135,15 @@ impl Application for CcBar {
                 .into()
         } else {
             let suggested = self.core.applet.suggested_size(true);
-            let chart_size = suggested.0 as f32;
+            let chart_size = (suggested.0 as f32) * 1.5;
             let mut row = widget::row().spacing(4);
 
             for session in sessions.iter().take(3) {
-                let model_label = match session.model_name.as_str() {
-                    "Opus" => 'O',
-                    "Sonnet" => 'S',
-                    "Haiku" => 'H',
-                    _ => '?',
-                };
+                let model_type_str = model_type(&session.model_name);
 
                 row = row.push(crate::chart::donut_view::<Message>(
                     session.context_used_percent,
-                    model_label,
+                    model_type_str,
                     chart_size,
                 ));
             }
@@ -164,12 +183,7 @@ impl Application for CcBar {
             )));
         } else {
             for session in sessions {
-                let model_label = match session.model_name.as_str() {
-                    "Opus" => "Opus",
-                    "Sonnet" => "Sonnet",
-                    "Haiku" => "Haiku",
-                    other => other,
-                };
+                let model_label = &session.model_name;
 
                 let duration_secs = session.duration_ms / 1000;
                 let duration_display = if duration_secs >= 3600 {
