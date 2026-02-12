@@ -107,17 +107,70 @@ impl Application for CcBar {
     }
 
     fn view(&self) -> Element<Self::Message> {
-        let content = widget::text("CC")
-            .size(16)
-            .width(Length::Shrink)
-            .height(Length::Shrink)
-            .horizontal_alignment(Alignment::Center)
-            .vertical_alignment(Alignment::Center);
+        let sessions = self.session_store.get_all_sessions();
 
-        self.context
-            .button_from_element(content, true)
-            .on_press_down(Message::TogglePopup)
-            .into()
+        if sessions.is_empty() {
+            // セッションなし：グレーアウトしたドーナツ
+            let content = widget::container(
+                widget::text("—")
+                    .size(20)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink)
+                    .horizontal_alignment(Alignment::Center)
+                    .vertical_alignment(Alignment::Center),
+            )
+            .width(Length::Fixed(48.0))
+            .height(Length::Fixed(48.0))
+            .center_x()
+            .center_y();
+
+            self.context
+                .button_from_element(content, true)
+                .on_press_down(Message::TogglePopup)
+                .into()
+        } else if sessions.len() == 1 {
+            // 1セッション：ドーナツチャート表示
+            let session = &sessions[0];
+            let model_label = match session.model_name.as_str() {
+                "Opus" => 'O',
+                "Sonnet" => 'S',
+                "Haiku" => 'H',
+                _ => '?',
+            };
+
+            let chart = crate::chart::DonutChart::new(session.context_used_percent, model_label);
+            let content = chart.view();
+
+            self.context
+                .button_from_element(content, true)
+                .on_press_down(Message::TogglePopup)
+                .into()
+        } else {
+            // 複数セッション：複数のドーナツを横並び
+            let mut row = widget::row().spacing(4);
+
+            for session in sessions.iter().take(3) {
+                let model_label = match session.model_name.as_str() {
+                    "Opus" => 'O',
+                    "Sonnet" => 'S',
+                    "Haiku" => 'H',
+                    _ => '?',
+                };
+
+                let chart =
+                    crate::chart::DonutChart::new(session.context_used_percent, model_label);
+                row = row.push(chart.view());
+            }
+
+            if sessions.len() > 3 {
+                row = row.push(widget::text(format!("+{}", sessions.len() - 3)).size(12));
+            }
+
+            self.context
+                .button_from_element(row, true)
+                .on_press_down(Message::TogglePopup)
+                .into()
+        }
     }
 
     fn view_window(&self, id: window::Id) -> Element<Self::Message> {
