@@ -17,25 +17,25 @@ fn colors_for_model(model_type: &str) -> ChartColors {
             line: "#FF8C1A",
             fill: "#FF8C1A60",
             background: "#1A1A1AE0",
-            frame: "#FF8C1A40",
+            frame: "#FFFFFF",
         },
         "Sonnet" => ChartColors {
             line: "#3366E6",
             fill: "#3366E660",
             background: "#1A1A1AE0",
-            frame: "#3366E640",
+            frame: "#FFFFFF",
         },
         "Haiku" => ChartColors {
             line: "#1AB34D",
             fill: "#1AB34D60",
             background: "#1A1A1AE0",
-            frame: "#1AB34D40",
+            frame: "#FFFFFF",
         },
         _ => ChartColors {
             line: "#808080",
             fill: "#80808060",
             background: "#1A1A1AE0",
-            frame: "#80808040",
+            frame: "#FFFFFF",
         },
     }
 }
@@ -117,13 +117,14 @@ fn generate_line_svg(samples: &VecDeque<f64>, model_type: &str) -> String {
 pub fn line_chart_view<'a, M: Clone + 'a>(
     samples: &VecDeque<f64>,
     model_type: &str,
-    size: f32,
+    width: f32,
+    height: f32,
 ) -> Element<'a, M> {
     let svg = generate_line_svg(samples, model_type);
     cosmic::widget::icon::from_svg_bytes(svg.into_bytes())
         .icon()
-        .width(Length::Fixed(size))
-        .height(Length::Fixed(size))
+        .width(Length::Fixed(width))
+        .height(Length::Fixed(height))
         .into()
 }
 

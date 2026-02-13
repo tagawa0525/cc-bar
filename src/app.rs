@@ -157,12 +157,18 @@ impl Application for CcBar {
         } else {
             let horizontal = self.core.applet.is_horizontal();
             let (w, h) = self.core.applet.suggested_size(false);
-            let chart_size = if horizontal { h as f32 } else { w as f32 };
+            // minimonと同様にwidth/heightを別々に使用
+            let (chart_w, chart_h) = if horizontal {
+                (h as f32, h as f32)
+            } else {
+                (w as f32, w as f32)
+            };
 
             crate::log!(
-                "cc-bar: rendering {} sessions at chart_size={} (horizontal={}, suggested=({},{}))",
+                "cc-bar: rendering {} sessions at {}x{} (horizontal={}, suggested=({},{}))",
                 sessions.len(),
-                chart_size,
+                chart_w,
+                chart_h,
                 horizontal,
                 w,
                 h,
@@ -175,7 +181,8 @@ impl Application for CcBar {
                     crate::chart::line_chart_view::<Message>(
                         &session.usage_history,
                         model_type_str,
-                        chart_size,
+                        chart_w,
+                        chart_h,
                     )
                 })
                 .collect();
