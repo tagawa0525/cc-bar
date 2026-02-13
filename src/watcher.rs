@@ -23,14 +23,25 @@ pub fn watch_sessions() -> Subscription<Message> {
                 sessions_dir.display()
             );
 
-            // 起動時に既存のセッションファイルを読み込む
+            // 起動時に既存のセッションファイルを読み込む（staleを除外）
             if let Ok(mut entries) = tokio::fs::read_dir(&sessions_dir).await {
+                let now = std::time::SystemTime::now();
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     if let Some(filename) = entry.file_name().to_str() {
                         if let Some(session_id) = filename.strip_suffix(".json") {
-                            let _ = output
-                                .send(Message::SessionUpdate(session_id.to_string()))
-                                .await;
+                            let is_fresh = entry
+                                .metadata()
+                                .await
+                                .and_then(|m| m.modified())
+                                .ok()
+                                .and_then(|mtime| now.duration_since(mtime).ok())
+                                .map(|age| age.as_secs() < 3600)
+                                .unwrap_or(false);
+                            if is_fresh {
+                                let _ = output
+                                    .send(Message::SessionUpdate(session_id.to_string()))
+                                    .await;
+                            }
                         }
                     }
                 }
