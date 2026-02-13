@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+pub const MAX_HISTORY_SAMPLES: usize = 21;
 
 /// Claude Code Status Line JSON
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +49,7 @@ pub struct SessionData {
     pub peak_usage_percent: u32,
     pub subagent_completed_count: u32,
     pub last_updated_at: u64,
+    pub usage_history: VecDeque<f64>,
 }
 
 /// セッションストア
@@ -85,6 +88,7 @@ impl SessionStore {
                 peak_usage_percent: used,
                 subagent_completed_count: 0,
                 last_updated_at: now,
+                usage_history: VecDeque::new(),
             });
 
         // Update fields
@@ -98,6 +102,12 @@ impl SessionStore {
         if used > session.peak_usage_percent {
             session.peak_usage_percent = used;
         }
+
+        // Track usage history
+        session.usage_history.push_back(used as f64);
+        if session.usage_history.len() > MAX_HISTORY_SAMPLES {
+            session.usage_history.pop_front();
+        }
     }
 
     /// セッションを追加/更新する（JSON直接）
@@ -107,6 +117,7 @@ impl SessionStore {
             .unwrap()
             .as_secs();
 
+        let used = session.context_used_percent;
         self.sessions
             .entry(session.session_id.clone())
             .and_modify(|s| {
@@ -117,10 +128,21 @@ impl SessionStore {
                 if session.context_used_percent > s.peak_usage_percent {
                     s.peak_usage_percent = session.context_used_percent;
                 }
+                s.usage_history.push_back(used as f64);
+                if s.usage_history.len() > MAX_HISTORY_SAMPLES {
+                    s.usage_history.pop_front();
+                }
             })
-            .or_insert(SessionData {
-                last_updated_at: now,
-                ..session
+            .or_insert_with(|| {
+                let mut s = SessionData {
+                    last_updated_at: now,
+                    ..session
+                };
+                s.usage_history.push_back(used as f64);
+                if s.usage_history.len() > MAX_HISTORY_SAMPLES {
+                    s.usage_history.pop_front();
+                }
+                s
             });
     }
 
