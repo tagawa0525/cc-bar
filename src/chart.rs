@@ -1,82 +1,180 @@
-use cosmic::iced::{Color, Length, Point, Radians, Rectangle};
-use cosmic::iced_widget::canvas;
+use std::collections::VecDeque;
+use std::fmt::Write;
+
+use cosmic::iced::Length;
 use cosmic::Element;
-use std::f32::consts::PI;
 
-/// 円グラフ（Canvas によるパイチャート）
-/// 使用率を扇形で表現し、モデル型で背景色を区別
-pub fn donut_view<'a, M: 'a>(percentage: u32, model_type: &str, size: f32) -> Element<'a, M> {
-    let percentage = percentage.min(100);
-
-    // モデル型ごとの背景色
-    let bg_color = match model_type {
-        "Opus" => Some(Color::from_rgb(0.9, 0.55, 0.1)), // オレンジ
-        "Sonnet" => Some(Color::from_rgb(0.2, 0.4, 0.8)), // 青
-        _ => None,                                       // Haiku等: なし
-    };
-
-    // 使用率に応じたグラフ色（緑→黄→赤）
-    let fg_color = match percentage {
-        0..=69 => Color::from_rgb(0.2, 0.7, 0.2),
-        70..=89 => Color::from_rgb(0.8, 0.7, 0.0),
-        _ => Color::from_rgb(0.8, 0.2, 0.2),
-    };
-
-    canvas::Canvas::<_, M, cosmic::Theme, cosmic::Renderer>::new(PieChart {
-        percentage,
-        bg_color,
-        fg_color,
-    })
-    .width(Length::Fixed(size))
-    .height(Length::Fixed(size))
-    .into()
+struct ChartColors {
+    line: &'static str,
+    fill: &'static str,
+    background: &'static str,
+    frame: &'static str,
 }
 
-struct PieChart {
-    percentage: u32,
-    bg_color: Option<Color>,
-    fg_color: Color,
+fn colors_for_model(model_type: &str) -> ChartColors {
+    match model_type {
+        "Opus" => ChartColors {
+            line: "#FF8C1A",
+            fill: "#FF8C1A60",
+            background: "#1A1A1AE0",
+            frame: "#FFFFFF",
+        },
+        "Sonnet" => ChartColors {
+            line: "#3366E6",
+            fill: "#3366E660",
+            background: "#1A1A1AE0",
+            frame: "#FFFFFF",
+        },
+        "Haiku" => ChartColors {
+            line: "#1AB34D",
+            fill: "#1AB34D60",
+            background: "#1A1A1AE0",
+            frame: "#FFFFFF",
+        },
+        _ => ChartColors {
+            line: "#808080",
+            fill: "#80808060",
+            background: "#1A1A1AE0",
+            frame: "#FFFFFF",
+        },
+    }
 }
 
-impl<M> canvas::Program<M, cosmic::Theme, cosmic::Renderer> for PieChart {
-    type State = ();
+fn generate_line_svg(samples: &VecDeque<f64>, model_type: &str) -> String {
+    let colors = colors_for_model(model_type);
 
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &cosmic::Renderer,
-        _theme: &cosmic::Theme,
-        bounds: Rectangle,
-        _cursor: cosmic::iced::mouse::Cursor,
-    ) -> Vec<canvas::Geometry<cosmic::Renderer>> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let center = Point::new(bounds.width / 2.0, bounds.height / 2.0);
-        let radius = bounds.width.min(bounds.height) / 2.0 - 0.5;
+    let mut svg = String::with_capacity(1024);
+    let _ = write!(
+        svg,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 42 42">"#
+    );
 
-        // 背景円（モデル型の色）
-        if let Some(bg) = self.bg_color {
-            frame.fill(&canvas::Path::circle(center, radius), bg);
+    // Clip path with rounded corners
+    let _ = write!(
+        svg,
+        r#"<defs><clipPath id="rc"><rect width="42" height="42" rx="7"/></clipPath></defs>"#
+    );
+    let _ = write!(svg, r#"<g clip-path="url(#rc)">"#);
+
+    // Background
+    let _ = write!(
+        svg,
+        r#"<rect width="42" height="42" fill="{}"/>"#,
+        colors.background
+    );
+
+    // Frame border
+    let _ = write!(
+        svg,
+        r#"<rect x="0.5" y="0.5" width="41" height="41" rx="6.5" fill="none" stroke="{}" stroke-width="1"/>"#,
+        colors.frame
+    );
+
+    if samples.is_empty() {
+        let _ = write!(svg, "</g></svg>");
+        return svg;
+    }
+
+    // Build polyline points and polygon points
+    let mut line_points = String::new();
+    let mut poly_points = String::new();
+
+    for (i, &value) in samples.iter().enumerate() {
+        let value = value.clamp(0.0, 100.0);
+        let x = (i * 2) + 1;
+        let y = 41.0 - (40.0 / 100.0 * value);
+        if i > 0 {
+            line_points.push(' ');
+            poly_points.push(' ');
         }
+        let _ = write!(line_points, "{},{:.1}", x, y);
+        let _ = write!(poly_points, "{},{:.1}", x, y);
+    }
 
-        // 使用率の扇形
-        if self.percentage > 0 {
-            let angle = (self.percentage as f32 / 100.0) * 2.0 * PI;
-            let start = -PI / 2.0; // 12時方向から開始
+    // Close polygon to bottom edge for fill
+    let last_x = (samples.len() - 1) * 2 + 1;
+    let first_x = 1;
+    let _ = write!(poly_points, " {},42 {},42", last_x, first_x);
 
-            let pie = canvas::Path::new(|b| {
-                b.move_to(center);
-                b.arc(canvas::path::Arc {
-                    center,
-                    radius,
-                    start_angle: Radians(start),
-                    end_angle: Radians(start + angle),
-                });
-                b.line_to(center);
-            });
+    // Fill area
+    let _ = write!(
+        svg,
+        r#"<polygon points="{}" fill="{}" stroke="none"/>"#,
+        poly_points, colors.fill
+    );
 
-            frame.fill(&pie, self.fg_color);
+    // Line stroke
+    let _ = write!(
+        svg,
+        r#"<polyline points="{}" fill="none" stroke="{}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>"#,
+        line_points, colors.line
+    );
+
+    let _ = write!(svg, "</g></svg>");
+    svg
+}
+
+pub fn line_chart_view<'a, M: Clone + 'a>(
+    samples: &VecDeque<f64>,
+    model_type: &str,
+    width: f32,
+    height: f32,
+) -> Element<'a, M> {
+    let svg = generate_line_svg(samples, model_type);
+    cosmic::widget::icon::from_svg_bytes(svg.into_bytes())
+        .icon()
+        .width(Length::Fixed(width))
+        .height(Length::Fixed(height))
+        .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_line_svg_empty() {
+        let samples = VecDeque::new();
+        let svg = generate_line_svg(&samples, "Opus");
+        assert!(svg.contains("viewBox=\"0 0 42 42\""));
+        assert!(!svg.contains("polyline"));
+    }
+
+    #[test]
+    fn test_generate_line_svg_single_sample() {
+        let mut samples = VecDeque::new();
+        samples.push_back(50.0);
+        let svg = generate_line_svg(&samples, "Sonnet");
+        assert!(svg.contains("polyline"));
+        assert!(svg.contains("#3366E6"));
+    }
+
+    #[test]
+    fn test_generate_line_svg_full_samples() {
+        let mut samples = VecDeque::new();
+        for i in 0..21 {
+            samples.push_back(i as f64 * 5.0);
         }
+        let svg = generate_line_svg(&samples, "Haiku");
+        assert!(svg.contains("#1AB34D"));
+        assert!(svg.contains("polygon"));
+        assert!(svg.contains("polyline"));
+        // Last point x = (20 * 2) + 1 = 41
+        assert!(svg.contains("41,"));
+    }
 
-        vec![frame.into_geometry()]
+    #[test]
+    fn test_colors_for_model() {
+        let opus = colors_for_model("Opus");
+        assert_eq!(opus.line, "#FF8C1A");
+
+        let sonnet = colors_for_model("Sonnet");
+        assert_eq!(sonnet.line, "#3366E6");
+
+        let haiku = colors_for_model("Haiku");
+        assert_eq!(haiku.line, "#1AB34D");
+
+        let unknown = colors_for_model("Unknown");
+        assert_eq!(unknown.line, "#808080");
     }
 }
