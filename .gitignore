@@ -8,5 +8,4 @@
 *.iml
 Cargo.lock
 .cargo/
-flake.lock
 .direnv/

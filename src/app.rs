@@ -5,14 +5,11 @@ use cosmic::{
     app::{Core, Task},
     iced::{
         platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
-        window, Limits, Subscription,
+        window, Alignment, Subscription,
     },
-    widget::{self, Id},
+    widget::{self, Row},
     Application, Element,
 };
-use std::sync::LazyLock;
-
-static AUTOSIZE_MAIN_ID: LazyLock<Id> = LazyLock::new(|| Id::new("autosize-main"));
 
 /// display_name（例: "Opus 4.6", "Sonnet"）からモデル型を返す
 fn model_type(display_name: &str) -> &'static str {
@@ -88,26 +85,40 @@ impl Application for CcBar {
 
                 match std::fs::read_to_string(&session_file) {
                     Ok(content) => {
-                        match serde_json::from_str::<crate::data::StatusLineData>(&content) {
-                            Ok(status) => {
-                                let project_dir = session_file
-                                    .parent()
-                                    .and_then(|p| p.parent())
-                                    .and_then(|p| p.file_name())
-                                    .and_then(|n| n.to_str())
-                                    .unwrap_or("Unknown")
-                                    .to_string();
-                                crate::log!(
-                                    "cc-bar: parsed session, usage={:?}%",
-                                    status.context_window.used_percentage
-                                );
-                                self.session_store
-                                    .update_from_status_line(status, project_dir);
+                        if content.is_empty() {
+                            crate::log!("cc-bar: file empty for {}", session_id);
+                        } else {
+                            match serde_json::from_str::<crate::data::StatusLineData>(&content) {
+                                Ok(status) => {
+                                    let project_dir = session_file
+                                        .parent()
+                                        .and_then(|p| p.parent())
+                                        .and_then(|p| p.file_name())
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("Unknown")
+                                        .to_string();
+                                    crate::log!(
+                                        "cc-bar: parsed {}, usage={:?}%, total={}",
+                                        session_id,
+                                        status.context_window.used_percentage,
+                                        self.session_store.session_count() + 1
+                                    );
+                                    self.session_store
+                                        .update_from_status_line(status, project_dir);
+                                }
+                                Err(e) => {
+                                    crate::log!(
+                                        "cc-bar: JSON parse error for {}: {}",
+                                        session_id,
+                                        e
+                                    );
+                                }
                             }
-                            Err(e) => crate::log!("cc-bar: JSON parse error: {}", e),
                         }
                     }
-                    Err(e) => crate::log!("cc-bar: file read error: {}", e),
+                    Err(e) => {
+                        crate::log!("cc-bar: file read error for {}: {}", session_id, e);
+                    }
                 }
                 Task::none()
             }
@@ -121,7 +132,8 @@ impl Application for CcBar {
                     std::path::PathBuf::from(format!("/run/user/{}", uid))
                 });
                 let sessions_dir = runtime_dir.join("cc-bar").join("sessions");
-                self.session_store.remove_stale_by_mtime(&sessions_dir, 15);
+                self.session_store
+                    .remove_stale_by_mtime(&sessions_dir, 3600);
                 Task::none()
             }
             Message::CloseRequested(id) => {
@@ -143,38 +155,57 @@ impl Application for CcBar {
                 .on_press_down(Message::TogglePopup)
                 .into()
         } else {
-            let suggested = self.core.applet.suggested_size(true);
-            let chart_size = suggested.1 as f32;
-            let mut row = widget::row().spacing(2);
+            let horizontal = self.core.applet.is_horizontal();
+            let (w, h) = self.core.applet.suggested_size(false);
+            let chart_size = if horizontal { h as f32 } else { w as f32 };
 
-            for session in &sessions {
-                let model_type_str = model_type(&session.model_name);
+            crate::log!(
+                "cc-bar: rendering {} sessions at chart_size={} (horizontal={}, suggested=({},{}))",
+                sessions.len(),
+                chart_size,
+                horizontal,
+                w,
+                h,
+            );
 
-                row = row.push(crate::chart::donut_view::<Message>(
-                    session.context_used_percent,
-                    model_type_str,
-                    chart_size,
-                ));
-            }
+            let charts: Vec<Element<Message>> = sessions
+                .iter()
+                .map(|session| {
+                    let model_type_str = model_type(&session.model_name);
+                    crate::chart::donut_view::<Message>(
+                        session.context_used_percent,
+                        model_type_str,
+                        chart_size,
+                    )
+                })
+                .collect();
 
-            let content = widget::mouse_area(row).on_press(Message::TogglePopup);
+            let wrapper: Element<Message> = if horizontal {
+                Row::with_children(charts)
+                    .align_y(Alignment::Center)
+                    .spacing(2.0)
+                    .into()
+            } else {
+                widget::column::with_children(charts)
+                    .align_x(Alignment::Center)
+                    .spacing(2.0)
+                    .into()
+            };
 
-            let mut limits = Limits::NONE.min_width(1.).min_height(1.);
-            if let Some(b) = self.core.applet.suggested_bounds {
-                if b.width as i32 > 0 {
-                    limits = limits.max_width(b.width);
-                }
-                if b.height as i32 > 0 {
-                    limits = limits.max_height(b.height);
-                }
-            }
+            let padding = self.core.applet.suggested_padding(true);
+            let button = widget::button::custom(wrapper)
+                .padding(if horizontal {
+                    [0, padding.1]
+                } else {
+                    [padding.0, 0]
+                })
+                .class(cosmic::theme::Button::AppletIcon)
+                .on_press(Message::TogglePopup);
 
-            widget::autosize::autosize(
-                widget::container(content).padding(0),
-                AUTOSIZE_MAIN_ID.clone(),
-            )
-            .limits(limits)
-            .into()
+            self.core
+                .applet
+                .autosize_window(widget::container(button))
+                .into()
         }
     }
 

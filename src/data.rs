@@ -238,6 +238,110 @@ mod tests {
     }
 
     #[test]
+    fn test_usage_history_accumulation() {
+        let mut store = SessionStore::new();
+
+        // 5回更新して履歴が蓄積されることを確認
+        for i in 0..5 {
+            let status = StatusLineData {
+                context_window: ContextWindow {
+                    used_percentage: Some(i * 20),
+                    remaining_percentage: Some(100 - i * 20),
+                    context_window_size: 200000,
+                    total_input_tokens: 100000,
+                    total_output_tokens: 5000,
+                },
+                model: Model {
+                    id: "claude-opus-4-6".to_string(),
+                    display_name: "Opus".to_string(),
+                },
+                session_id: "session_hist".to_string(),
+                cost: Cost {
+                    total_cost_usd: 0.10,
+                    total_duration_ms: 100000,
+                },
+            };
+            store.update_from_status_line(status, "/home/user/project".to_string());
+        }
+
+        let sessions = store.get_all_sessions();
+        let session = &sessions[0];
+        assert_eq!(session.usage_history.len(), 5);
+        assert_eq!(session.usage_history[0], 0.0);
+        assert_eq!(session.usage_history[4], 80.0);
+    }
+
+    #[test]
+    fn test_usage_history_max_samples_bound() {
+        use crate::data::MAX_HISTORY_SAMPLES;
+        let mut store = SessionStore::new();
+
+        // MAX_HISTORY_SAMPLES + 5回更新
+        for i in 0..(MAX_HISTORY_SAMPLES + 5) {
+            let status = StatusLineData {
+                context_window: ContextWindow {
+                    used_percentage: Some(i as u32),
+                    remaining_percentage: Some(100 - i as u32),
+                    context_window_size: 200000,
+                    total_input_tokens: 100000,
+                    total_output_tokens: 5000,
+                },
+                model: Model {
+                    id: "claude-opus-4-6".to_string(),
+                    display_name: "Opus".to_string(),
+                },
+                session_id: "session_bound".to_string(),
+                cost: Cost {
+                    total_cost_usd: 0.10,
+                    total_duration_ms: 100000,
+                },
+            };
+            store.update_from_status_line(status, "/home/user/project".to_string());
+        }
+
+        let sessions = store.get_all_sessions();
+        let session = &sessions[0];
+        assert_eq!(session.usage_history.len(), MAX_HISTORY_SAMPLES);
+        // 古いデータが押し出され、最後のMAX_HISTORY_SAMPLES個が残る
+        assert_eq!(session.usage_history[0], 5.0); // 最初の5つが押し出された
+        assert_eq!(
+            *session.usage_history.back().unwrap(),
+            (MAX_HISTORY_SAMPLES + 4) as f64
+        );
+    }
+
+    #[test]
+    fn test_usage_history_via_update_session() {
+        use std::collections::VecDeque;
+        let mut store = SessionStore::new();
+
+        let mut history = VecDeque::new();
+        history.push_back(10.0);
+        history.push_back(20.0);
+
+        let session = SessionData {
+            session_id: "session_direct".to_string(),
+            project_dir: "/tmp".to_string(),
+            model_name: "Sonnet".to_string(),
+            context_used_percent: 30,
+            cost_usd: 0.05,
+            duration_ms: 50000,
+            peak_usage_percent: 30,
+            subagent_completed_count: 0,
+            last_updated_at: 0,
+            usage_history: history,
+        };
+
+        store.update_session(session);
+
+        let sessions = store.get_all_sessions();
+        let s = &sessions[0];
+        // update_sessionでは既存値にpush_backで30%が追加される
+        assert_eq!(s.usage_history.len(), 3);
+        assert_eq!(*s.usage_history.back().unwrap(), 30.0);
+    }
+
+    #[test]
     fn test_peak_usage_tracking() {
         let mut store = SessionStore::new();
 

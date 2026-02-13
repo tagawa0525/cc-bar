@@ -1,82 +1,44 @@
-use cosmic::iced::{Color, Length, Point, Radians, Rectangle};
-use cosmic::iced_widget::canvas;
-use cosmic::Element;
-use std::f32::consts::PI;
+use cosmic::iced::{Color, Length};
+use cosmic::widget::container;
+use cosmic::{Element, Theme};
 
-/// 円グラフ（Canvas によるパイチャート）
-/// 使用率を扇形で表現し、モデル型で背景色を区別
-pub fn donut_view<'a, M: 'a>(percentage: u32, model_type: &str, size: f32) -> Element<'a, M> {
+/// R付き四角形インジケータ
+/// モデル型で基本色、使用率で濃さを調整
+pub fn donut_view<'a, M: Clone + 'a>(
+    percentage: u32,
+    model_type: &str,
+    size: f32,
+) -> Element<'a, M> {
     let percentage = percentage.min(100);
 
-    // モデル型ごとの背景色
-    let bg_color = match model_type {
-        "Opus" => Some(Color::from_rgb(0.9, 0.55, 0.1)), // オレンジ
-        "Sonnet" => Some(Color::from_rgb(0.2, 0.4, 0.8)), // 青
-        _ => None,                                       // Haiku等: なし
+    // モデル型ごとの基本色（RGB）
+    let (r, g, b) = match model_type {
+        "Opus" => (1.0, 0.55, 0.1),  // オレンジ
+        "Sonnet" => (0.2, 0.4, 0.9), // 青
+        "Haiku" => (0.1, 0.7, 0.3),  // 緑
+        _ => (0.5, 0.5, 0.5),        // その他: グレー
     };
 
-    // 使用率に応じたグラフ色（緑→黄→赤）
-    let fg_color = match percentage {
-        0..=69 => Color::from_rgb(0.2, 0.7, 0.2),
-        70..=89 => Color::from_rgb(0.8, 0.7, 0.0),
-        _ => Color::from_rgb(0.8, 0.2, 0.2),
-    };
+    // 使用率による濃さ調整（低→暗い、高→明るい）
+    let intensity = 0.4 + (percentage as f32 / 100.0) * 0.6;
+    let bg_color = Color::from_rgb(r * intensity, g * intensity, b * intensity);
 
-    canvas::Canvas::<_, M, cosmic::Theme, cosmic::Renderer>::new(PieChart {
-        percentage,
-        bg_color,
-        fg_color,
-    })
-    .width(Length::Fixed(size))
-    .height(Length::Fixed(size))
-    .into()
-}
-
-struct PieChart {
-    percentage: u32,
-    bg_color: Option<Color>,
-    fg_color: Color,
-}
-
-impl<M> canvas::Program<M, cosmic::Theme, cosmic::Renderer> for PieChart {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &cosmic::Renderer,
-        _theme: &cosmic::Theme,
-        bounds: Rectangle,
-        _cursor: cosmic::iced::mouse::Cursor,
-    ) -> Vec<canvas::Geometry<cosmic::Renderer>> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let center = Point::new(bounds.width / 2.0, bounds.height / 2.0);
-        let radius = bounds.width.min(bounds.height) / 2.0 - 0.5;
-
-        // 背景円（モデル型の色）
-        if let Some(bg) = self.bg_color {
-            frame.fill(&canvas::Path::circle(center, radius), bg);
-        }
-
-        // 使用率の扇形
-        if self.percentage > 0 {
-            let angle = (self.percentage as f32 / 100.0) * 2.0 * PI;
-            let start = -PI / 2.0; // 12時方向から開始
-
-            let pie = canvas::Path::new(|b| {
-                b.move_to(center);
-                b.arc(canvas::path::Arc {
-                    center,
-                    radius,
-                    start_angle: Radians(start),
-                    end_angle: Radians(start + angle),
-                });
-                b.line_to(center);
-            });
-
-            frame.fill(&pie, self.fg_color);
-        }
-
-        vec![frame.into_geometry()]
-    }
+    container(cosmic::widget::text(""))
+        .width(Length::Fixed(size))
+        .height(Length::Fixed(size))
+        .center_x(Length::Fixed(size))
+        .center_y(Length::Fixed(size))
+        .class(cosmic::style::Container::custom(move |theme: &Theme| {
+            let cosmic = theme.cosmic();
+            container::Style {
+                background: Some(bg_color.into()),
+                border: cosmic::iced::Border {
+                    radius: [4.0; 4].into(),
+                    width: 0.0,
+                    color: cosmic.background.divider.into(),
+                },
+                ..Default::default()
+            }
+        }))
+        .into()
 }
