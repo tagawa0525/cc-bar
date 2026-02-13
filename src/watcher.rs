@@ -35,7 +35,7 @@ pub fn watch_sessions() -> Subscription<Message> {
                                 .and_then(|m| m.modified())
                                 .ok()
                                 .and_then(|mtime| now.duration_since(mtime).ok())
-                                .map(|age| age.as_secs() < 3600)
+                                .map(|age| age.as_secs() < crate::data::STALE_THRESHOLD_SECS)
                                 .unwrap_or(false);
                             if is_fresh {
                                 let _ = output
