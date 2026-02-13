@@ -133,7 +133,7 @@ impl Application for CcBar {
                 });
                 let sessions_dir = runtime_dir.join("cc-bar").join("sessions");
                 self.session_store
-                    .remove_stale_by_mtime(&sessions_dir, 3600);
+                    .remove_stale_by_mtime(&sessions_dir, crate::data::STALE_THRESHOLD_SECS);
                 Task::none()
             }
             Message::CloseRequested(id) => {

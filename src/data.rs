@@ -3,6 +3,8 @@ use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_HISTORY_SAMPLES: usize = 21;
+/// ファイル未更新でセッションをstaleとみなす秒数
+pub const STALE_THRESHOLD_SECS: u64 = 120;
 
 /// Claude Code Status Line JSON
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,10 +105,12 @@ impl SessionStore {
             session.peak_usage_percent = used;
         }
 
-        // Track usage history
-        session.usage_history.push_back(used as f64);
-        if session.usage_history.len() > MAX_HISTORY_SAMPLES {
-            session.usage_history.pop_front();
+        // Track usage history (usage_percentageがNullの場合は追加しない)
+        if status.context_window.used_percentage.is_some() {
+            session.usage_history.push_back(used as f64);
+            if session.usage_history.len() > MAX_HISTORY_SAMPLES {
+                session.usage_history.pop_front();
+            }
         }
     }
 
