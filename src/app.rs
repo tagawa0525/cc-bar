@@ -172,8 +172,8 @@ impl Application for CcBar {
                 .iter()
                 .map(|session| {
                     let model_type_str = model_type(&session.model_name);
-                    crate::chart::donut_view::<Message>(
-                        session.context_used_percent,
+                    crate::chart::line_chart_view::<Message>(
+                        &session.usage_history,
                         model_type_str,
                         chart_size,
                     )
