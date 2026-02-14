@@ -17,7 +17,15 @@ pub fn watch_sessions() -> Subscription<Message> {
             let sessions_dir = runtime_dir.join("cc-bar").join("sessions");
 
             // ディレクトリが存在しない場合は作成
-            let _ = tokio::fs::create_dir_all(&sessions_dir).await;
+            if let Err(e) = tokio::fs::create_dir_all(&sessions_dir).await {
+                crate::log!(
+                    "cc-bar: failed to create sessions_dir {}: {}",
+                    sessions_dir.display(),
+                    e
+                );
+                std::future::pending::<()>().await;
+                unreachable!()
+            }
             crate::log!(
                 "cc-bar: watcher started, sessions_dir={}",
                 sessions_dir.display()
@@ -63,19 +71,27 @@ pub fn watch_sessions() -> Subscription<Message> {
             // CLOSE_WRITE: 直接書き込みのフォールバック
             // CREATE: 新規ファイル作成
             // DELETE: ファイル削除でセッション除去
-            if inotify
-                .watches()
-                .add(
+            loop {
+                match inotify.watches().add(
                     &sessions_dir,
                     WatchMask::MOVED_TO
                         | WatchMask::CLOSE_WRITE
                         | WatchMask::CREATE
                         | WatchMask::DELETE,
-                )
-                .is_err()
-            {
-                std::future::pending::<()>().await;
-                unreachable!()
+                ) {
+                    Ok(_) => {
+                        crate::log!("cc-bar: inotify watch added for {}", sessions_dir.display());
+                        break;
+                    }
+                    Err(e) => {
+                        crate::log!(
+                            "cc-bar: inotify watch add failed for {}: {}. retrying in 5s",
+                            sessions_dir.display(),
+                            e
+                        );
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
+                }
             }
 
             // async EventStreamを使用（blocking APIの代わり）
