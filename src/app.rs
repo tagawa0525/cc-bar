@@ -162,17 +162,6 @@ impl Application for CcBar {
             } else {
                 (w as f32, w as f32)
             };
-
-            crate::log!(
-                "cc-bar: rendering {} sessions at {}x{} (horizontal={}, suggested=({},{}))",
-                sessions.len(),
-                chart_w,
-                chart_h,
-                horizontal,
-                w,
-                h,
-            );
-
             let charts: Vec<Element<Message>> = sessions
                 .iter()
                 .map(|session| {
