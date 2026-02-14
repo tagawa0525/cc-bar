@@ -13,6 +13,8 @@ pub struct StatusLineData {
     pub model: Model,
     pub session_id: String,
     pub cost: Cost,
+    #[serde(default)]
+    pub subagent_completed_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +101,11 @@ impl SessionStore {
         session.cost_usd = status.cost.total_cost_usd;
         session.duration_ms = status.cost.total_duration_ms;
         session.last_updated_at = now;
+
+        // subagent_completed_count: 値がある場合のみ更新（既存値を保持）
+        if let Some(count) = status.subagent_completed_count {
+            session.subagent_completed_count = count;
+        }
 
         // Track peak usage
         if used > session.peak_usage_percent {
@@ -252,6 +259,7 @@ mod tests {
                 total_cost_usd: 0.10,
                 total_duration_ms: 100000,
             },
+            subagent_completed_count: None,
         };
 
         store.update_from_status_line(status, "/home/user/project".to_string());
