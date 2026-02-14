@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=CC Bar
+Comment=Claude Code Context Window Monitor
+Icon=utilities-system-monitor
+Exec=cc-bar
+Terminal=false
+Categories=COSMIC;
+NoDisplay=true
+X-CosmicApplet=true
+X-HostWaylandDisplay=true
+X-OverflowPriority=5
+X-OverflowMinSize=1
