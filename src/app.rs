@@ -18,7 +18,7 @@ fn model_type(display_name: &str) -> &'static str {
         "Opus" => "Opus",
         "Sonnet" => "Sonnet",
         "Haiku" => "Haiku",
-        _ => "Sonnet",
+        _ => "Unknown",
     }
 }
 
@@ -90,13 +90,12 @@ impl Application for CcBar {
                         } else {
                             match serde_json::from_str::<crate::data::StatusLineData>(&content) {
                                 Ok(status) => {
-                                    let project_dir = session_file
-                                        .parent()
-                                        .and_then(|p| p.parent())
-                                        .and_then(|p| p.file_name())
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("Unknown")
-                                        .to_string();
+                                    // NOTE: The session file path is always `<runtime_dir>/cc-bar/sessions/<id>.json`,
+                                    // so deriving a project directory name from its parent directories would always
+                                    // yield "cc-bar" and not the actual project. Until project information is
+                                    // provided via a reliable source (e.g., included in the JSON by the relay),
+                                    // we explicitly mark the project as unknown here.
+                                    let project_dir = "Unknown".to_string();
                                     crate::log!(
                                         "cc-bar: parsed {}, usage={:?}%, total={}",
                                         session_id,
@@ -163,17 +162,6 @@ impl Application for CcBar {
             } else {
                 (w as f32, w as f32)
             };
-
-            crate::log!(
-                "cc-bar: rendering {} sessions at {}x{} (horizontal={}, suggested=({},{}))",
-                sessions.len(),
-                chart_w,
-                chart_h,
-                horizontal,
-                w,
-                h,
-            );
-
             let charts: Vec<Element<Message>> = sessions
                 .iter()
                 .map(|session| {
