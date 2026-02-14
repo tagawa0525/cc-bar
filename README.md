@@ -4,7 +4,7 @@
 
 ## 機能
 
-- **パネル表示**: アクティブセッションごとのコンテキスト使用率をドーナツチャート形式で表示
+- **パネル表示**: アクティブセッションごとのコンテキスト使用率を折れ線グラフで表示
   - 緑色 (<70%): 余裕あり
   - 黄色 (70-89%): 中程度
   - 赤色 (>=90%): 満杯に近い
@@ -13,7 +13,7 @@
   - コスト、経過時間、ピーク使用率
   - サブエージェント完了数
 - **自動監視**: Claude CodeのStatus Lineで自動更新
-- **Stale除去**: 5分間更新がないセッションは自動削除
+- **Stale除去**: 2分間更新がないセッションは自動削除
 
 ## 要件
 
@@ -58,9 +58,9 @@ just configure
 
 ```json
 {
-  "statusLine": "~/.local/bin/cc-bar-relay.sh",
+  "statusLine": { "type": "command", "command": "~/.local/bin/cc-bar-relay.sh" },
   "hooks": {
-    "SubagentStop": "~/.local/bin/cc-bar-subagent-hook.sh"
+    "SubagentStop": { "type": "command", "command": "~/.local/bin/cc-bar-subagent-hook.sh" }
   }
 }
 ```
