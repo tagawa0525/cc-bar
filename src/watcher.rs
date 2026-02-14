@@ -37,14 +37,39 @@ pub fn watch_sessions() -> Subscription<Message> {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     if let Some(filename) = entry.file_name().to_str() {
                         if let Some(session_id) = filename.strip_suffix(".json") {
-                            let is_fresh = entry
-                                .metadata()
-                                .await
-                                .and_then(|m| m.modified())
-                                .ok()
-                                .and_then(|mtime| now.duration_since(mtime).ok())
-                                .map(|age| age.as_secs() < crate::data::STALE_THRESHOLD_SECS)
-                                .unwrap_or(false);
+                            let is_fresh = match entry.metadata().await {
+                                Ok(metadata) => match metadata.modified() {
+                                    Ok(mtime) => match now.duration_since(mtime) {
+                                        Ok(age) => {
+                                            age.as_secs() < crate::data::STALE_THRESHOLD_SECS
+                                        }
+                                        Err(_) => {
+                                            // mtime が未来 → システム時刻異常の可能性があるが fresh として扱う
+                                            crate::log!(
+                                                "cc-bar: mtime is in the future for {}, treating as fresh",
+                                                filename
+                                            );
+                                            true
+                                        }
+                                    },
+                                    Err(_) => {
+                                        // mtime 取得失敗 → fresh として扱う
+                                        crate::log!(
+                                            "cc-bar: failed to get mtime for {}, treating as fresh",
+                                            filename
+                                        );
+                                        true
+                                    }
+                                },
+                                Err(_) => {
+                                    // metadata 取得失敗 → fresh として扱う
+                                    crate::log!(
+                                        "cc-bar: failed to get metadata for {}, treating as fresh",
+                                        filename
+                                    );
+                                    true
+                                }
+                            };
                             if is_fresh {
                                 let _ = output
                                     .send(Message::SessionUpdate(session_id.to_string()))
@@ -98,7 +123,8 @@ pub fn watch_sessions() -> Subscription<Message> {
             let mut buffer = [0u8; 4096];
             let mut event_stream = match inotify.into_event_stream(&mut buffer) {
                 Ok(s) => s,
-                Err(_) => {
+                Err(e) => {
+                    crate::log!("cc-bar: failed to create inotify event stream: {}", e);
                     std::future::pending::<()>().await;
                     unreachable!()
                 }
