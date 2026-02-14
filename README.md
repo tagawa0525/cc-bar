@@ -5,9 +5,7 @@
 ## 機能
 
 - **パネル表示**: アクティブセッションごとのコンテキスト使用率を折れ線グラフで表示
-  - 緑色 (<70%): 余裕あり
-  - 黄色 (70-89%): 中程度
-  - 赤色 (>=90%): 満杯に近い
+  - モデル種別で色分け: Opus (紫)、Sonnet (青)、Haiku (緑)、Unknown (灰)
 - **ポップアップ**: クリックでセッション詳細を表示
   - プロジェクト名、モデル、コンテキスト使用率
   - コスト、経過時間、ピーク使用率
@@ -18,6 +16,7 @@
 ## 要件
 
 - Rust 1.70+
+- jq (Status Line / Hook スクリプトで使用)
 - Nix (オプション、開発環境用)
 - Claude Code (Version 1.40+)
 - Cosmic Desktop Environment
@@ -60,7 +59,13 @@ just configure
 {
   "statusLine": { "type": "command", "command": "~/.local/bin/cc-bar-relay.sh" },
   "hooks": {
-    "SubagentStop": { "type": "command", "command": "~/.local/bin/cc-bar-subagent-hook.sh" }
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "~/.local/bin/cc-bar-subagent-hook.sh" }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -92,7 +97,7 @@ Claude Code Session ──> cc-bar-relay.sh ──> $XDG_RUNTIME_DIR/cc-bar/sess
                                                   inotify watch
                                                       ↓
                                                 cc-bar (Cosmic Applet)
-                                          Panel: [◉62%] [◉85%]  ←  ドーナツチャート×N
+                                          Panel: [📈62%] [📈85%]  ←  折れ線グラフ×N
                                           Popup: セッション詳細
 ```
 
@@ -104,7 +109,7 @@ Claude Code Session ──> cc-bar-relay.sh ──> $XDG_RUNTIME_DIR/cc-bar/sess
 | `src/app.rs` | Application trait実装 |
 | `src/data.rs` | Status Line JSON型、SessionStore |
 | `src/watcher.rs` | inotifyファイル監視Subscription |
-| `src/chart.rs` | ドーナツチャートUI |
+| `src/chart.rs` | SVG折れ線グラフ生成 |
 | `scripts/cc-bar-relay.sh` | Status Lineスクリプト |
 | `scripts/cc-bar-subagent-hook.sh` | SubagentStopフック |
 
@@ -114,7 +119,7 @@ Claude Code Session ──> cc-bar-relay.sh ──> $XDG_RUNTIME_DIR/cc-bar/sess
 2. **Cosmicパネルを右クリック**
 3. **"CC Bar"を追加** (アプレットリスト内)
 4. **複数セッション実行**
-5. **パネルにドーナツチャート表示** (リアルタイム更新)
+5. **パネルに折れ線グラフ表示** (リアルタイム更新)
 6. **クリックでセッション詳細表示**
 
 ## トラブルシューティング
