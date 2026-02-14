@@ -24,8 +24,16 @@ if [ -z "$session_id" ]; then
     exit 1
 fi
 
+# session_id をファイル名として安全な文字種に正規化
+safe_session_id=$(printf '%s' "$session_id" | tr -c 'A-Za-z0-9_.-' '_')
+
+if [ -z "$safe_session_id" ]; then
+    echo "Error: session_id is invalid after sanitization" >&2
+    exit 1
+fi
+
 # セッションファイルパス
-session_file="${SESSIONS_DIR}/${session_id}.json"
+session_file="${SESSIONS_DIR}/${safe_session_id}.json"
 temp_file="${session_file}.tmp.$$"
 
 # Atomic write: 一時ファイルに書き込んでからリネーム
