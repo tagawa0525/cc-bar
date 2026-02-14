@@ -53,6 +53,7 @@ install: build
     cp target/release/cc-bar "$INSTALL_DIR/"
     cp scripts/cc-bar-relay.sh "$INSTALL_DIR/"
     cp scripts/cc-bar-subagent-hook.sh "$INSTALL_DIR/"
+    cp scripts/cc-bar-session-cleanup.sh "$INSTALL_DIR/"
 
     echo "✓ Installed to $INSTALL_DIR"
     echo ""
