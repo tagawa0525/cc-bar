@@ -89,7 +89,7 @@ configure:
         --arg subagent_hook "$SUBAGENT_HOOK_SCRIPT" \
         '.statusLine = {"type": "command", "command": $status_line} |
          .hooks //= {} |
-         .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": $subagent_hook}]}]' \
+         .hooks.SubagentStop = [{"matcher": "", "hooks": [{"type": "command", "command": $subagent_hook}]}]' \
         "$SETTINGS" > "$SETTINGS.tmp" && \
         mv "$SETTINGS.tmp" "$SETTINGS"
 
