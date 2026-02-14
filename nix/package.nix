@@ -22,10 +22,12 @@ rustPlatform.buildRustPackage {
     # シェルスクリプトをインストール
     install -Dm755 scripts/cc-bar-relay.sh $out/bin/cc-bar-relay.sh
     install -Dm755 scripts/cc-bar-subagent-hook.sh $out/bin/cc-bar-subagent-hook.sh
+    install -Dm755 scripts/cc-bar-session-cleanup.sh $out/bin/cc-bar-session-cleanup.sh
 
     # スクリプトが jq を確実に見つけられるよう PATH をラップ
     wrapProgram $out/bin/cc-bar-relay.sh --prefix PATH : ${lib.makeBinPath [ jq ]}
     wrapProgram $out/bin/cc-bar-subagent-hook.sh --prefix PATH : ${lib.makeBinPath [ jq ]}
+    wrapProgram $out/bin/cc-bar-session-cleanup.sh --prefix PATH : ${lib.makeBinPath [ jq ]}
 
     # デスクトップファイルをインストール（COSMIC がアプレットとして認識）
     install -Dm644 data/com.github.tagawa.cc-bar.desktop $out/share/applications/com.github.tagawa.cc-bar.desktop
