@@ -18,7 +18,7 @@ fn model_type(display_name: &str) -> &'static str {
         "Opus" => "Opus",
         "Sonnet" => "Sonnet",
         "Haiku" => "Haiku",
-        _ => "Sonnet",
+        _ => "Unknown",
     }
 }
 
