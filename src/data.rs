@@ -140,7 +140,7 @@ impl SessionStore {
                     s.peak_usage_percent = session.context_used_percent;
                 }
                 s.usage_history.push_back(used as f64);
-                if s.usage_history.len() > MAX_HISTORY_SAMPLES {
+                while s.usage_history.len() > MAX_HISTORY_SAMPLES {
                     s.usage_history.pop_front();
                 }
             })
@@ -150,7 +150,7 @@ impl SessionStore {
                     ..session
                 };
                 s.usage_history.push_back(used as f64);
-                if s.usage_history.len() > MAX_HISTORY_SAMPLES {
+                while s.usage_history.len() > MAX_HISTORY_SAMPLES {
                     s.usage_history.pop_front();
                 }
                 s
