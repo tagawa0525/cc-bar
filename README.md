@@ -61,8 +61,17 @@ just configure
   "hooks": {
     "SubagentStop": [
       {
+        "matcher": "",
         "hooks": [
           { "type": "command", "command": "~/.local/bin/cc-bar-subagent-hook.sh" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.local/bin/cc-bar-session-cleanup.sh" }
         ]
       }
     ]
