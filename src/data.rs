@@ -294,6 +294,7 @@ mod tests {
                     total_cost_usd: 0.10,
                     total_duration_ms: 100000,
                 },
+                subagent_completed_count: None,
             };
             store.update_from_status_line(status, "/home/user/project".to_string());
         }
@@ -329,6 +330,7 @@ mod tests {
                     total_cost_usd: 0.10,
                     total_duration_ms: 100000,
                 },
+                subagent_completed_count: None,
             };
             store.update_from_status_line(status, "/home/user/project".to_string());
         }
@@ -396,6 +398,7 @@ mod tests {
                 total_cost_usd: 0.05,
                 total_duration_ms: 50000,
             },
+            subagent_completed_count: None,
         };
 
         store.update_from_status_line(status1, "/home/user/project".to_string());
@@ -420,6 +423,7 @@ mod tests {
                 total_cost_usd: 0.15,
                 total_duration_ms: 100000,
             },
+            subagent_completed_count: None,
         };
 
         store.update_from_status_line(status2, "/home/user/project".to_string());
