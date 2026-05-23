@@ -1,6 +1,8 @@
 use crate::message::Message;
-use cosmic::iced::{futures::SinkExt, stream, Subscription};
-use futures_util::StreamExt;
+use cosmic::iced::{
+    futures::{channel::mpsc, SinkExt, StreamExt},
+    stream, Subscription,
+};
 use inotify::{EventMask, Inotify, WatchMask};
 use std::path::PathBuf;
 use tokio::time::interval;
@@ -9,7 +11,7 @@ use tokio::time::interval;
 /// inotifyのasync EventStream APIを使用
 pub fn watch_sessions() -> Subscription<Message> {
     Subscription::run(|| {
-        stream::channel(100, |mut output| async move {
+        stream::channel(100, |mut output: mpsc::Sender<Message>| async move {
             let runtime_dir = dirs::runtime_dir().unwrap_or_else(|| {
                 let uid = unsafe { libc::getuid() };
                 PathBuf::from(format!("/run/user/{}", uid))
@@ -161,7 +163,7 @@ pub fn watch_sessions() -> Subscription<Message> {
 /// 定期タイマー Subscription (stale除去用)
 pub fn tick_timer() -> Subscription<Message> {
     Subscription::run(|| {
-        stream::channel(100, |mut output| async move {
+        stream::channel(100, |mut output: mpsc::Sender<Message>| async move {
             let mut interval = interval(std::time::Duration::from_secs(10));
             loop {
                 interval.tick().await;
