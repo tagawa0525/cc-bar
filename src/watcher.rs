@@ -1,9 +1,8 @@
 use crate::message::Message;
 use cosmic::iced::{
-    futures::{channel::mpsc, SinkExt},
+    futures::{channel::mpsc, SinkExt, StreamExt},
     stream, Subscription,
 };
-use futures_util::StreamExt;
 use inotify::{EventMask, Inotify, WatchMask};
 use std::path::PathBuf;
 use tokio::time::interval;
