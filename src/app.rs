@@ -211,7 +211,7 @@ impl Application for CcBar {
 
         let sessions = self.session_store.get_all_sessions();
 
-        let mut content = widget::column()
+        let mut content = widget::Column::new()
             .padding([8, 0])
             .spacing(4)
             .push(cosmic::applet::padded_control(widget::text::body(
@@ -238,7 +238,7 @@ impl Application for CcBar {
                     format!("{}s", duration_secs)
                 };
 
-                let session_row = widget::column()
+                let session_row = widget::Column::new()
                     .spacing(2)
                     .push(widget::text::body(format!(
                         "{} | {} | {}%",
@@ -267,7 +267,7 @@ impl Application for CcBar {
         Some(Message::CloseRequested(id))
     }
 
-    fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
+    fn style(&self) -> Option<cosmic::iced::theme::Style> {
         Some(cosmic::applet::style())
     }
 }
