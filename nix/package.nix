@@ -1,8 +1,9 @@
-{ lib
-, rustPlatform
-, libcosmicAppHook
-, makeWrapper
-, jq
+{
+  lib,
+  rustPlatform,
+  libcosmicAppHook,
+  makeWrapper,
+  jq,
 }:
 
 rustPlatform.buildRustPackage {

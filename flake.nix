@@ -6,16 +6,27 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, rust-overlay }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+    }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
 
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      nixpkgsFor = forAllSystems (system: import nixpkgs {
-        inherit system;
-        overlays = [ self.overlays.default ];
-      });
+      nixpkgsFor = forAllSystems (
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ self.overlays.default ];
+        }
+      );
     in
     {
       # 他の flake から使えるオーバーレイ
@@ -30,14 +41,18 @@
       });
 
       # 開発シェル（rust-overlay で最新ツールチェーンを使用）
-      devShells = forAllSystems (system:
+      devShells = forAllSystems (
+        system:
         let
           pkgs = import nixpkgs {
             inherit system;
             overlays = [ (import rust-overlay) ];
           };
           rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-            extensions = [ "rust-src" "rust-analyzer" ];
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+            ];
           };
         in
         {
@@ -65,25 +80,30 @@
             ];
 
             shellHook = ''
-              export PKG_CONFIG_PATH="${pkgs.lib.concatStringsSep ":" [
-                "${pkgs.libxkbcommon.dev}/lib/pkgconfig"
-                "${pkgs.fontconfig.dev}/lib/pkgconfig"
-                "${pkgs.freetype.dev}/lib/pkgconfig"
-                "${pkgs.expat.dev}/lib/pkgconfig"
-                "${pkgs.openssl.dev}/lib/pkgconfig"
-                "${pkgs.wayland.dev}/lib/pkgconfig"
-                "${pkgs.wayland-protocols}/share/pkgconfig"
-              ]}''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              export PKG_CONFIG_PATH="${
+                pkgs.lib.concatStringsSep ":" [
+                  "${pkgs.libxkbcommon.dev}/lib/pkgconfig"
+                  "${pkgs.fontconfig.dev}/lib/pkgconfig"
+                  "${pkgs.freetype.dev}/lib/pkgconfig"
+                  "${pkgs.expat.dev}/lib/pkgconfig"
+                  "${pkgs.openssl.dev}/lib/pkgconfig"
+                  "${pkgs.wayland.dev}/lib/pkgconfig"
+                  "${pkgs.wayland-protocols}/share/pkgconfig"
+                ]
+              }''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 
-              export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-                pkgs.wayland
-                pkgs.libxkbcommon
-                pkgs.fontconfig
-                pkgs.freetype
-                pkgs.expat
-              ]}:$LD_LIBRARY_PATH"
+              export LD_LIBRARY_PATH="${
+                pkgs.lib.makeLibraryPath [
+                  pkgs.wayland
+                  pkgs.libxkbcommon
+                  pkgs.fontconfig
+                  pkgs.freetype
+                  pkgs.expat
+                ]
+              }:$LD_LIBRARY_PATH"
             '';
           };
-        });
+        }
+      );
     };
 }
