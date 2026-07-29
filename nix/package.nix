@@ -1,8 +1,9 @@
-{ lib
-, rustPlatform
-, libcosmicAppHook
-, makeWrapper
-, jq
+{
+  lib,
+  rustPlatform,
+  libcosmicAppHook,
+  makeWrapper,
+  jq,
 }:
 
 rustPlatform.buildRustPackage {
@@ -11,7 +12,7 @@ rustPlatform.buildRustPackage {
 
   src = lib.cleanSource ./..;
 
-  cargoHash = "sha256-e9KwSB6PehYVEUms9aGeTCr2lcmfTF3HzwqNCZj4si4=";
+  cargoHash = "sha256-eGotG8nrFC2x23yQT9oKM1odrAl9fZWcsvVBLLQVG6g=";
 
   nativeBuildInputs = [
     libcosmicAppHook
